@@ -1,0 +1,5 @@
+protobuf==3.20.3
+tensorflow==2.15.1
+tensorflow_intel==2.15.1
+fastapi==0.68.1
+uvicorn==0.15.0
