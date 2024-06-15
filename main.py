@@ -69,7 +69,10 @@ class ImagePathRequest(BaseModel):
 @app.post("/predict_image/")
 def predict_image(request: ImagePathRequest):
     try:
-        img = read_image_from_gcs(bucket_name, request.image_path)
+        # Mengambil path dari image_path
+        image_path = request.image_path  # Ini akan menjadi "taskImage/download.jpeg" dari permintaan HTTP
+        
+        img = read_image_from_gcs(bucket_name, image_path)
 
         if img.mode == 'RGBA':
             img = img.convert('RGB')
@@ -85,9 +88,9 @@ def predict_image(request: ImagePathRequest):
         probability = predictions[0][predicted_class_idx]
 
         if probability >= 0.8:
-            result = {"class": predicted_class_name, "probability": float(probability)}
+            result = {"class": predicted_class_name}
         else:
-            result = {"class": "barang tidak diketahui", "probability": float(probability)}
+            result = {"class": "barang tidak diketahui"}
 
         return result
     except Exception as e:
