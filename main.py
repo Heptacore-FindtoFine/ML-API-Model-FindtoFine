@@ -52,14 +52,14 @@ class PredictionRequest(BaseModel):
     data: list
 
 # Endpoint untuk memprediksi data (sebagai tensor)
-@app.post("/predict_data/")
-def predict_data(request: PredictionRequest):
-    try:
-        input_data = tf.constant(request.data, dtype=tf.float32)
-        predictions = model(input_data).numpy().tolist()
-        return {"predictions": predictions}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+# @app.post("/predict_data/")
+# def predict_data(request: PredictionRequest):
+#     try:
+#         input_data = tf.constant(request.data, dtype=tf.float32)
+#         predictions = model(input_data).numpy().tolist()
+#         return {"predictions": predictions}
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
 
 # Contoh request body untuk gambar prediksi
 class ImagePathRequest(BaseModel):
