@@ -1,15 +1,11 @@
-# Mengimpor modul yang diperlukan
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from google.cloud import storage # type : ignore
-import tensorflow as tf # type : ignore
+import tensorflow as tf
 import numpy as np
 import os
-import gcsfs  # type : ignore
-from google.colab import auth # type : ignore
-
-# Autentikasi Google Cloud
-auth.authenticate_user()
+import gcsfs
+import io
+from PIL import Image
 
 # Inisialisasi aplikasi FastAPI
 app = FastAPI()
@@ -39,12 +35,19 @@ classes_names = ['air mineral', 'jaket gunung', 'jas hujan', 'kompor portable',
                  'lampu senter', 'sarung tangan gunung', 'sepatu gunung',
                  'sleeping bag', 'tas gunung', 'tenda', 'tikar', 'topi gunung']
 
+# Fungsi untuk membaca gambar dari GCS
+def read_image_from_gcs(bucket_name, image_path):
+    fs = gcsfs.GCSFileSystem(project='heptacore-findtofine')
+    with fs.open(f'{bucket_name}/{image_path}', 'rb') as f:
+        img = Image.open(io.BytesIO(f.read()))
+        return img
+
 # Endpoint untuk mengecek apakah server berjalan
 @app.get("/")
 def read_root():
     return {"message": "Server is running"}
 
-# Contoh request body
+# Contoh request body untuk data prediksi
 class PredictionRequest(BaseModel):
     data: list
 
@@ -52,33 +55,35 @@ class PredictionRequest(BaseModel):
 @app.post("/predict_data/")
 def predict_data(request: PredictionRequest):
     try:
-        # Konversi data input ke dalam tensor
         input_data = tf.constant(request.data, dtype=tf.float32)
-        # Lakukan prediksi menggunakan model
         predictions = model(input_data).numpy().tolist()
         return {"predictions": predictions}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# Endpoint untuk memprediksi kelas dari gambar yang diunggah
-@app.post("/predict_image/")
-async def predict_image(file: UploadFile = File(...)):
-    try:
-        # Baca file gambar yang diunggah
-        contents = await file.read()
-        image = tf.image.decode_image(contents, channels=3)
-        # Ubah ukuran gambar menjadi 224x224 sesuai ekspektasi model
-        image = tf.image.resize(image, [224, 224])
-        image = tf.expand_dims(image, axis=0)  # Tambahkan batch dimension
-        image = tf.cast(image, tf.float32) / 255.0  # Normalisasi
+# Contoh request body untuk gambar prediksi
+class ImagePathRequest(BaseModel):
+    image_path: str
 
-        # Lakukan prediksi
-        predictions = model.predict(image)
+# Endpoint untuk memprediksi kelas dari gambar dengan path GCS
+@app.post("/predict_image/")
+def predict_image(request: ImagePathRequest):
+    try:
+        img = read_image_from_gcs(bucket_name, request.image_path)
+
+        if img.mode == 'RGBA':
+            img = img.convert('RGB')
+
+        img = img.resize((224, 224))
+        x = tf.keras.preprocessing.image.img_to_array(img)
+        x = tf.expand_dims(x, axis=0)
+        x = tf.cast(x, tf.float32) / 255.0
+
+        predictions = model.predict(x)
         predicted_class_idx = np.argmax(predictions[0])
         predicted_class_name = classes_names[predicted_class_idx]
         probability = predictions[0][predicted_class_idx]
 
-        # Cek probabilitas
         if probability >= 0.8:
             result = {"class": predicted_class_name, "probability": float(probability)}
         else:
