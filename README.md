@@ -6,7 +6,7 @@
 ## Getting Started
 ### Step 1 : Clone Repo
 ```
-
+git clone https://github.com/Heptacore-FindtoFine/ML-API-Model-FindtoFine.git
 ```
 ### Step 2 : Download all dependencies
 ```
